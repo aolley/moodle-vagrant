@@ -1,0 +1,372 @@
+# .bashrc
+umask 0002
+if [ -t 1 ]
+then
+    stty stop ''
+fi
+
+# Source global definitions
+if [ -f /etc/bashrc ]; then
+    . /etc/bashrc
+fi
+
+export EDITOR=vim
+export VAGRANT_DEFAULT_PROVIDER=virtualbox
+
+# User specific aliases and functions
+[ -z "$SSH_CLIENT" ] && . $HOME/.ssh-agent
+alias keyon="ssh-add -t 29000"
+alias keyoff='ssh-add -D'
+alias keylist='ssh-add -l'
+alias grep='grep --color=auto'
+alias gerp='grep --color=auto'
+alias ..='cd ..'
+alias ssh="ssh -A"
+#useful aliases
+alias conf="php admin/cli/conf.php"
+#git aliases
+alias git="LANG=C git"
+alias gh='git log --pretty=oneline'
+alias gl='git pull'
+alias gp='git push'
+alias gpom='git push origin master'
+alias gd='git diff'
+alias gc='git commit'
+alias gca='git commit --amend'
+alias gco='git checkout'
+alias gb='git branch'
+alias gbh='git log --graph --simplify-by-decoration --pretty=format:"%d %h %s" --remotes=origin'
+alias gs='git status'
+alias gpull='git pull origin master'
+alias gg='git grep -n'
+alias gcp='git cherry-pick'
+alias gk="git log --pretty=format:'%h : %s (%Cblue%an%Creset) %d' --graph"
+alias glog="git log --pretty=full"
+alias grh="git reset --hard"
+alias gv="git revert"
+function grb() {
+    git push origin :$1
+    git push origin $1
+}
+function gcc() {
+    if [[ $1 =~ ^base\/ ]]
+    then
+        git checkout $1
+    elif [[ $1 =~ ^hosted\/ ]]
+    then
+        git checkout $1
+    else
+        git checkout client/$1
+    fi
+}
+function grho() {
+    GIT_BRANCH="$(git branch --no-color 2> /dev/null | sed -e '/^[^*]/d' -e 's/* \(.*\)/\1/')"
+    git reset --hard origin/$GIT_BRANCH
+}
+function gpf() {
+    GIT_BRANCH="$(git branch --no-color 2> /dev/null | sed -e '/^[^*]/d' -e 's/* \(.*\)/\1/')"
+    GIT_REVCOUNT="$(git rev-list origin/$GIT_BRANCH.. --count)"
+
+    read -p "$GIT_REVCOUNT commits, are you sure? " -n 1 -r
+    echo ""
+    if [[ $REPLY =~ ^[Yy]$ ]]
+    then
+        git push origin HEAD:refs/for/$GIT_BRANCH
+    fi
+}
+function ghm() {
+    git log --oneline --format=%s $1.. | grep -E '^MDL-|^BASE-|^HOSTED-'
+}
+
+function jira() {
+    IFS="="
+    I=1
+    URL=""
+    USER=""
+    PASS=""
+    while read -r name value
+    do
+        if [ $I -eq 1 ]
+        then
+            URL="$value"
+        elif [ $I -eq 2 ]
+        then
+            USER="$value"
+        elif [ $I -eq 3 ]
+        then
+            PASS="$value"
+        fi
+        ((I++))
+    done < ~/.jira-authentication
+    /opt/jira-cli/jira.sh --server=$URL --user=$USER --password=$PASS "$@"
+}
+alias jirac='jira --custom "10402:Non-Destructive,10803:Not required,10401:No,10801:Yes" --action createIssue'
+
+alias sshx='/usr/bin/ssh -fCT'
+
+#moodle aliases
+alias mpw="moosh plugin-whitelist"
+alias behatinit="php admin/tool/behat/cli/init.php"
+alias unitinit="php admin/tool/phpunit/cli/init.php"
+alias unitinitrun="php admin/tool/phpunit/cli/init.php && vendor/bin/phpunit"
+
+PRIMARYHOST="condev"
+
+# Terminal Title
+
+set_terminal_title() {
+    if [[ -z $@ ]]
+    then
+        TERMINAL_TITLE=$PWD
+    else
+        TERMINAL_TITLE=$@
+    fi
+}
+alias stt='set_terminal_title'
+STANDARD_PROMPT_COMMAND='stt;history -a ; echo -ne "\033]0;${TERMINAL_TITLE}\007" && _set_prod_warn'
+PROMPT_COMMAND=$STANDARD_PROMPT_COMMAND
+
+function _set_prod_warn {
+    DIR=`pwd`
+    PRODWARNING=""
+    if [[ $DIR == *-prod* ]]
+    then
+        PRODWARNING=":PRODUCTION SYSTEM"
+    fi
+}
+
+if [ -t 1 ]
+then
+    COLOR_RED=$(tput sgr0 && tput setaf 1)
+    COLOR_GREEN=$(tput sgr0 && tput setaf 2)
+    COLOR_YELLOW=$(tput sgr0 && tput setaf 3)
+    COLOR_BLUE=$(tput sgr0 && tput setaf 4)
+    COLOR_MAGENTA=$(tput sgr0 && tput setaf 5)
+    COLOR_CYAN=$(tput sgr0 && tput setaf 6)
+    COLOR_GRAY=$(tput sgr0 && tput setaf 7)
+    COLOR_WHITE=$(tput sgr0 && tput setaf 7 && tput bold)
+    COLOR_RESET=$(tput sgr0)
+fi
+
+###############################################################################
+# Parses Git info for prompt
+ 
+function _set_git_envar_info {
+    GIT_BRANCH=""
+    GIT_HEAD=""
+    GIT_STATE=""
+    GIT_LEADER=""
+    GIT_ROOT=""
+    MAX_CONFLICTED_FILES=2
+    DELTA_CHAR="△"
+    CONFLICT_CHAR="☢"
+    NEWMPATH=':'${PWD##*/}
+    if [[ $(which git 2> /dev/null) ]]
+    then
+        local STATUS
+        STATUS=$(git status 2>/dev/null)
+        if [[ -z $STATUS ]]
+        then
+            return
+        fi
+        GIT_LEADER=":"
+        GIT_BRANCH="$(git branch --no-color 2> /dev/null | sed -e '/^[^*]/d' -e 's/* \(.*\)/\1/')"
+        GIT_HEAD=":$(git log -1 --quiet --pretty=format:%h 2> /dev/null)"
+        GIT_ROOT=./$(git rev-parse --show-cdup)
+
+        local MDIR=`pwd -P`
+        local MPATH=`git rev-parse --show-toplevel`
+        local MNAME=${MPATH##*/}
+        local MPATH_LEN=`expr length $MPATH`+1
+        NEWMPATH=":$MNAME/"${MDIR:$MPATH_LEN}
+
+        if [[ "$STATUS" == *'working directory clean'* ]]
+        then
+            GIT_STATE=""
+        else
+            GIT_HEAD=$GIT_HEAD":"
+            GIT_STATE=""
+            if [[ "$STATUS" == *'Changes to be committed:'* ]]
+            then
+                GIT_STATE=$GIT_STATE'+I' # Index has files staged for commit
+            fi
+            if [[ "$STATUS" == *'Changed but not updated:'* ]]
+            then
+                GIT_STATE=$GIT_STATE"+M" # Working tree has files modified but unstaged
+            fi
+            if [[ "$STATUS" == *'Changes not staged for commit:'* ]]
+            then
+                GIT_STATE=$GIT_STATE"+M" # Working tree has files modified but unstaged
+            fi
+            if [[ "$STATUS" == *'Untracked files:'* ]]
+            then
+                GIT_STATE=$GIT_STATE'+U' # Working tree has untracked files
+            fi
+
+            # Any conflicts?
+            MAX_CONFLICTED_FILES=$(($MAX_CONFLICTED_FILES + 1))
+            files=$(git ls-files -u $MPATH | cut -f 2 | sort -u | sed $MAX_CONFLICTED_FILES,1000d | sed -e :a -e '$!N;s/\n/, /;ta' -e 'P;D')
+            if [ -n "$files" ]; then
+                GIT_STATE=$GIT_STATE" $COLOR_YELLOW$CONFLICT_CHAR$COLOR_RED ($files)$COLOR_RESET"
+            fi
+            GIT_STATE=$GIT_STATE''
+        fi
+    fi
+}
+ 
+###############################################################################
+# Composes prompt.
+function setps1 {
+ 
+    # Help message.
+    local USAGE="Usage: setps1 [none] [screen=<0|1>] [user=<0|1>] [dir=<0|1|2>] [git=<0|1>] [wrap=<0|1>] [which-python=<0|1>] [multiline=<0|1>]"
+ 
+    if [[ (-z $@) || ($@ == "*-h*") || ($@ == "*--h*") ]]
+    then
+        echo $USAGE
+        return
+    fi
+ 
+    # Prompt colors.
+    local CLEAR="\[\033[0m\]"
+    local STY_COLOR='\[\033[1;37;41m\]'
+    local PROMPT_COLOR='\[\033[1;94m\]'
+    local USER_HOST_COLOR='\[\033[1;30m\]'
+    local PROMPT_DIR_COLOR='\[\033[1;94m\]'
+    local GIT_LEADER_COLOR='\[\033[1;30m\]'
+    local GIT_BRANCH_COLOR=$CLEAR'\[\033[1;90m\]\[\033[4;90m\]'
+    local GIT_HEAD_COLOR=$CLEAR'\[\033[1;32m\]'
+    local GIT_STATE_COLOR=$CLEAR'\[\033[1;31m\]'
+    local PROD_WARNING_COLOR='\[\033[5;1;31m\]'
+ 
+    # Hostname-based colors in prompt.
+    if [[ $HOSTNAME != $PRIMARYHOST ]]
+    then
+        USER_HOST_COLOR=$REMOTE_USER_HOST_COLOR
+    fi
+ 
+    # Start with empty prompt.
+    local PROMPTSTR=""
+ 
+    # Set screen session id.
+    if [[ $@ == *screen=1* ]]
+    then
+        ## Decorate prompt with indication of screen session ##
+        if [[ -z "$STY" ]] # if screen session variable is not defined
+        then
+            local SCRTAG=""
+        else
+            local SCRTAG="$STY_COLOR(STY ${STY%%.*})$CLEAR" # get screen session number
+        fi
+    fi
+
+    # Set user@host.
+    if [[ $@ == *user=1* ]]
+    then
+         PROMPTSTR=$PROMPTSTR"$USER_HOST_COLOR\\u@\\h$CLEAR"
+    fi
+
+    PROMPTSTR=$PROMPTSTR$PROD_WARNING_COLOR"\$PRODWARNING"$CLEAR
+
+    # Set directory.
+    if [[ -n $PROMPTSTR && ($@ == *dir=1* || $@ == *dir=2*) ]]
+    then
+            PROMPTSTR=$PROMPTSTR"$PROMPT_COLOR:"
+    fi
+ 
+    if [[ $@ == *dir=1* ]]
+    then
+        PROMPTSTR=$PROMPTSTR"$PROMPT_DIR_COLOR\W$CLEAR"
+    elif [[ $@ == *dir=2* ]]
+    then
+        PROMPTSTR=$PROMPTSTR"$PROMPT_DIR_COLOR\$(pwd -P)$CLEAR"
+    elif [[ $@ == *dir=3* ]]
+    then
+        PROMPTSTR=$PROMPTSTR"$PROMPT_DIR_COLOR\$NEWMPATH$CLEAR"
+    fi
+ 
+    # Set git.
+    if [[ $@ == *git=1* ]]
+    then
+        PROMPT_COMMAND="$STANDARD_PROMPT_COMMAND && _set_git_envar_info"
+        PROMPTSTR=$PROMPTSTR"$BG_COLOR$GIT_LEADER_COLOR\$GIT_LEADER$GIT_BRANCH_COLOR"
+        PROMPTSTR=$PROMPTSTR"\$GIT_BRANCH$GIT_HEAD_COLOR\$GIT_HEAD$GIT_STATE_COLOR\$GIT_STATE$CLEAR"
+    else
+        PROMPT_COMMAND=$STANDARD_PROMPT_COMMAND
+    fi
+
+    # Display error codes
+    PS1_ERROR='$(
+    ret=$?;
+    if [ $ret -gt 0 ]; then
+        (( i = 3 - ${#ret} ));
+        echo -n "\e[1;31m\]:err=";
+        [ $i -gt 0 ] && echo -n "";
+        echo -n "$ret";
+        [ $i -eq 2 ] && echo -n "";
+        echo -n "\[\e[0m\]";
+    fi
+    )'
+    PROMPTSTR="$PROMPTSTR$PS1_ERROR"
+ 
+    # Set wrap.
+    if [[ $@ == *wrap=1* ]]
+    then
+        local WRAP="$CLEAR\n"
+    else
+        local WRAP=""
+    fi
+ 
+    # Set wrap.
+    if [[ $@ == *which-python=1* ]]
+    then
+        local WHICHPYTHON="$CLEAR\n(python is '\$(which python)')$CLEAR\n"
+    else
+        local WHICHPYTHON=""
+    fi
+ 
+    # Finalize.
+    if [[ -z $PROMPTSTR || $@ == none ]]
+    then
+        PROMPTSTR="\$ "
+    else
+        PROMPTSTR="$SCRTAG${PROMPT_COLOR}[$CLEAR$PROMPTSTR$PROMPT_COLOR]$WRAP$WHICHPYTHON$PROMPT_COLOR"
+    fi
+
+    if [[ $@ == *multiline=1* ]]
+    then
+        LINE2="└─"$'\u257c'
+        PROMPTSTR="┌─${PROMPTSTR}\n$CLEAR$LINE2 "
+    else
+        PROMPTSTR="${PROMPTSTR}\$$CLEAR "
+    fi
+ 
+    # Set.
+    PS1=$PROMPTSTR
+    PS2='> '
+    PS4='+ '
+}
+ 
+alias setps1-long='setps1 screen=1 user=1 dir=2 git=1 wrap=1'
+alias setps1-short='setps1 screen=1 user=1 dir=1 git=1 wrap=0'
+alias setps1-default='setps1-short'
+alias setps1-plain='setps1 screen=0 user=0 dir=0 git=0 wrap=0'
+alias setps1-nogit='setps1 screen=0 user=1 dir=1 git=0 wrap=0'
+alias setps1-local-long='setps1 screen=1 user=0 dir=2 git=1 wrap=1'
+alias setps1-local-short='setps1 screen=0 user=0 dir=1 git=1 wrap=0'
+alias setps1-local='setps1-local-short'
+alias setps1-dev-short='setps1 screen=0 user=0 dir=1 git=1 wrap=0 which-python=1'
+alias setps1-dev-long='setps1 screen=0 user=1 dir=2 git=1 wrap=0 which-python=1'
+alias setps1-dev-remote='setps1 screen=0 user=1 dir=1 git=1 wrap=0 which-python=1'
+alias setps1-primary='setps1 screen=1 user=1 dir=3 git=1 wrap=0 which-python=0 multiline=1'
+alias setps1-oneline='setps1 screen=1 user=1 dir=3 git=1 wrap=0 which-python=0 multiline=0'
+if [ -t 1 ]
+then
+    if [[ "$HOSTNAME" = *"$PRIMARYHOST"* ]]
+    then
+        setps1 screen=1 user=1 dir=3 git=1 wrap=0 which-python=0 multiline=1
+    else
+        setps1 screen=1 user=1 dir=1 git=0 wrap=0 which-python=0 multiline=0
+    fi
+    set_terminal_title
+fi
