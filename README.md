@@ -9,6 +9,6 @@ Comes preconfigured with:
 
 A copy of Moodle (/var/www/moodle/html) that can be reached from the host machine by adding the following line to your hosts file:
 
-127.0.0.1 moodle.condev.vm
+192.168.38.10 moodle.condev.vm
 
 Mailcatcher is preconfigured and accessible on port 1080 of the guest machine.
