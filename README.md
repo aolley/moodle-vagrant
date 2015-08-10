@@ -11,4 +11,8 @@ A copy of Moodle (/var/www/moodle/html) that can be reached from the host machin
 
 192.168.38.10 moodle.condev.vm
 
+Moodle credentials:
+Username: admin
+Password: moodle
+
 Mailcatcher is preconfigured and accessible on port 1080 of the guest machine.
